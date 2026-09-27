@@ -5,6 +5,12 @@ from ultralytics import YOLO
 # Load YOLO model only once
 model = YOLO("models/yolo11n.pt")
 
+VEHICLE_CLASS_NAMES = {
+    2: "car",
+    3: "motorcycle",
+    5: "bus",
+    7: "truck"
+}
 
 def detect_vehicle(
     image_path,
@@ -17,6 +23,7 @@ def detect_vehicle(
     Returns:
         annotated_image_path
         vehicle_image_paths (list)
+        vehicle_types (list)
     """
 
     os.makedirs(vehicle_folder, exist_ok=True)
@@ -35,6 +42,7 @@ def detect_vehicle(
 
     vehicle_count = 0
     vehicle_image_paths = []
+    vehicle_types = []
 
     # ----------------------------
     # Crop Vehicles
@@ -49,7 +57,11 @@ def detect_vehicle(
             if confidence < 0.5:
                 continue
 
+            class_id = int(box.cls[0])
+            vehicle_type = VEHICLE_CLASS_NAMES.get(class_id, "unknown")
+
             vehicle_count += 1
+
 
             x1, y1, x2, y2 = map(int, box.xyxy[0])
 
@@ -73,8 +85,9 @@ def detect_vehicle(
             cv2.imwrite(vehicle_path, cropped_vehicle)
 
             vehicle_image_paths.append(vehicle_path)
+            vehicle_types.append(vehicle_type)
 
-            print(f"Saved Vehicle: {vehicle_path}")
+            print(f"Saved Vehicle: {vehicle_path}, {vehicle_type}")
 
     # ----------------------------
     # Bounding Boxes
@@ -97,4 +110,4 @@ def detect_vehicle(
 
     print(f"Saved Bounding Box Image: {annotated_image_path}")
 
-    return annotated_image_path, vehicle_image_paths
+    return annotated_image_path, vehicle_image_paths, vehicle_types

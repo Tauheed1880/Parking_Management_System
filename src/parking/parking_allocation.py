@@ -1,20 +1,23 @@
 import pandas as pd
-from src.parking.draw_parking_layout import draw_parking_layout
 
-CSV_FILE = "output/parking_layout/parking_layout.csv"
-
-
-def load_parking_layout():
-    return pd.read_csv(CSV_FILE)
+OUTPUT_FOLDER = "output/parking_layout"
 
 
-def save_parking_layout(df):
-    df.to_csv(CSV_FILE, index=False)
+def get_csv_path(vehicle_type):
+    return f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.csv"
 
 
-def get_best_parking_slot():
+def load_parking_layout(vehicle_type):
+    return pd.read_csv(get_csv_path(vehicle_type))
 
-    df = load_parking_layout()
+
+def save_parking_layout(df, vehicle_type):
+    df.to_csv(get_csv_path(vehicle_type), index=False)
+
+
+def get_best_parking_slot(vehicle_type):
+
+    df = load_parking_layout(vehicle_type)
 
     best_slot = None
     longest_sequence = 0
@@ -52,9 +55,9 @@ def get_best_parking_slot():
     return best_slot["slot"]
 
 
-def occupy_slot(slot_id):
+def occupy_slot(slot_id,vehicle_type):
 
-    df = load_parking_layout()
+    df = load_parking_layout(vehicle_type)
 
     index = df[df["slot"] == slot_id].index
 
@@ -63,14 +66,14 @@ def occupy_slot(slot_id):
 
     df.loc[index, "status"] = "occupied"
 
-    save_parking_layout(df)
+    save_parking_layout(df,vehicle_type)
 
     return True
 
 
-def free_slot(slot_id):
+def free_slot(slot_id,vehicle_type):
 
-    df = load_parking_layout()
+    df = load_parking_layout(vehicle_type)
 
     index = df[df["slot"] == slot_id].index
 
@@ -79,22 +82,22 @@ def free_slot(slot_id):
 
     df.loc[index, "status"] = "empty"
 
-    save_parking_layout(df)
+    save_parking_layout(df,vehicle_type)
 
     return True
 
 
-def allocate_parking():
+def allocate_parking(vehicle_type):
 
-    slot = get_best_parking_slot()
+    slot = get_best_parking_slot(vehicle_type)
 
     if slot is None:
         return None
 
-    occupy_slot(slot)
+    occupy_slot(slot,vehicle_type)
 
-    # Update parking layout image
-    draw_parking_layout()
+    # # Update parking layout image
+    # draw_parking_layout()
 
     print(f"Assigned Slot: {slot}")
 

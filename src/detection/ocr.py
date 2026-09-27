@@ -2,7 +2,7 @@ import os
 import cv2
 import re
 import csv
-import easyocr
+from paddleocr import PaddleOCR
 
 # -----------------------------------
 # OUTPUT FOLDER
@@ -24,11 +24,11 @@ csv_path = os.path.join(
 # LOAD OCR MODEL
 # -----------------------------------
 
-print("Loading EasyOCR...")
+print("Loading PaddleOCR...")
 
-reader = easyocr.Reader(["en"])
+reader = PaddleOCR(lang="en")
 
-print("EasyOCR loaded successfully.\n")
+print("PaddleOCR loaded successfully.\n")
 
 
 # -----------------------------------
@@ -71,7 +71,7 @@ def read_plate(plate_image_paths):
 
         print(f"Processing: {filename}")
 
-        results = reader.readtext(
+        results = reader.predict(
             plate
         )
 
@@ -84,26 +84,35 @@ def read_plate(plate_image_paths):
         # ----------------------------
 
         for result in results:
+           
+            result_dict = result.json
+            res = result_dict["res"]
 
-            _, text, confidence = result
+            texts = res.get("rec_texts", [])
+            scores = res.get("rec_scores", [])
 
-            cleaned_text = clean_plate_text(
-                text
-            )
+            for text, confidence in zip(
+                texts,
+                scores
+            ):
 
-            if cleaned_text:
-
-                detected_texts.append(
-                    cleaned_text
+                cleaned_text = clean_plate_text(
+                    text
                 )
 
-                confidences.append(
-                    float(confidence)
-                )
+                if cleaned_text:
 
-                print(
-                    f"Detected: {cleaned_text}"
-                )
+                    detected_texts.append(
+                        cleaned_text
+                    )
+
+                    confidences.append(
+                        float(confidence)
+                    )
+
+                    print(
+                        f"Detected: {cleaned_text}"
+                    )
 
         # ----------------------------
         # OCR RESULT
@@ -135,6 +144,7 @@ def read_plate(plate_image_paths):
         # STORE OCR RECORD
         # ----------------------------
 
+        
         ocr_records.append({
 
             "image": filename,
@@ -194,3 +204,5 @@ def read_plate(plate_image_paths):
     )
 
     return csv_path, ocr_records
+
+

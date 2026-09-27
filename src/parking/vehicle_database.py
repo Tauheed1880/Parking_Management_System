@@ -16,6 +16,7 @@ def load_database():
 
     columns = [
         "plate_number",
+        "vehicle_type",
         "entry_time",
         "exit_time",
         "assigned_slot",
@@ -88,13 +89,15 @@ def get_vehicle(plate_number):
 # ADD NEW VEHICLE
 # ---------------------------------------
 
-def add_vehicle(plate_number):
+def add_vehicle(plate_number, vehicle_type):
 
     df = load_database()
 
     new_vehicle = pd.DataFrame([{
 
         "plate_number": plate_number,
+
+        "vehicle_type": vehicle_type,
 
         "entry_time": datetime.now().strftime(
             "%Y-%m-%d %H:%M:%S"

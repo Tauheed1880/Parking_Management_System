@@ -1,25 +1,30 @@
 import cv2
 import pandas as pd
 
-# Original parking image (without boxes)
-IMAGE_PATH = "output/parking_layout/base_layout.jpg"
+# # Original parking image (without boxes)
+# IMAGE_PATH = "output/parking_layout/base_layout.jpg"
 
-# Parking layout CSV
-CSV_PATH = "output/parking_layout/parking_layout.csv"
+# # Parking layout CSV
+# CSV_PATH = "output/parking_layout/parking_layout.csv"
 
-# Output image
-OUTPUT_PATH = "output/parking_layout/parking_layout.jpg"
+# # Output image
+# OUTPUT_PATH = "output/parking_layout/parking_layout.jpg"
 
+OUTPUT_FOLDER = "output/parking_layout"
 
-def draw_parking_layout():
+def draw_parking_layout(vehicle_type):
 
-    image = cv2.imread(IMAGE_PATH)
+    image_path = f"{OUTPUT_FOLDER}/{vehicle_type}_base_layout.jpg"
+    csv_path = f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.csv"
+    output_path = f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.jpg"
+
+    image = cv2.imread(image_path)
 
     if image is None:
         print("Could not load parking image.")
         return None
 
-    df = pd.read_csv(CSV_PATH)
+    df = pd.read_csv(csv_path)
 
     for _, row in df.iterrows():
 
@@ -54,9 +59,9 @@ def draw_parking_layout():
             1
         )
 
-    cv2.imwrite(OUTPUT_PATH, image)
+    cv2.imwrite(output_path, image)
 
     print("Parking layout updated.")
-    print(OUTPUT_PATH)
+    print(output_path)
 
-    return OUTPUT_PATH
+    return output_path

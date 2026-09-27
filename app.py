@@ -3,7 +3,6 @@ from datetime import datetime
 
 import pandas as pd
 import streamlit as st
-from PIL import Image
 
 # -----------------------------
 # Detection Modules
@@ -31,6 +30,7 @@ from src.parking.vehicle_database import (
     update_exit_time,
     remove_slot,
     add_vehicle,
+    get_vehicle
 )
 
 # -----------------------------
@@ -54,6 +54,7 @@ with open("assets/style.css") as css:
         unsafe_allow_html=True
     )
 
+
 # -----------------------------
 # CONSTANT PATHS
 # -----------------------------
@@ -66,7 +67,14 @@ VEHICLE_DATABASE = "data/vehicles.csv"
 
 OCR_RESULTS = "output/ocr_results/plate_results.csv"
 
-PARKING_LAYOUT_IMAGE = "output/parking_layout/parking_layout.jpg"
+PARKING_LAYOUT_IMAGE = "output/parking_layout/car_parking_layout.jpg"
+
+VEHICLE_LAYOUT_MAP = {
+    "car": "car",
+    "motorcycle": "motorcycle",
+    "bus": "bus",
+    "truck": "bus",
+}
 
 os.makedirs(TEMP_FOLDER, exist_ok=True)
 
@@ -74,12 +82,27 @@ os.makedirs(TEMP_FOLDER, exist_ok=True)
 # HELPER FUNCTIONS
 # -----------------------------
 
+# def load_parking_layout():
+
+#     if os.path.exists(PARKING_LAYOUT_CSV):
+#         return pd.read_csv(PARKING_LAYOUT_CSV)
+
+#     return pd.DataFrame()
 def load_parking_layout():
 
-    if os.path.exists(PARKING_LAYOUT_CSV):
-        return pd.read_csv(PARKING_LAYOUT_CSV)
+    dfs = []
 
-    return pd.DataFrame()
+    for vehicle_type in ["car", "motorcycle", "bus"]:
+
+        path = f"output/parking_layout/{vehicle_type}_parking_layout.csv"
+
+        if os.path.exists(path):
+            dfs.append(pd.read_csv(path))
+
+    if len(dfs) == 0:
+        return pd.DataFrame()
+
+    return pd.concat(dfs, ignore_index=True)
 
 
 def load_vehicle_database():
@@ -310,6 +333,8 @@ defaults = {
 
     "uploaded_image": None,
 
+    "vehicle_type": None,
+
     "vehicle_detection": None,
 
     "vehicle_crop": None,
@@ -355,18 +380,21 @@ if process_button:
             # Vehicle Detection
             # ----------------------------------------
 
-            vehicle_detection_image, vehicle_images = detect_vehicle(
+            vehicle_detection_image, vehicle_images, vehicle_type = detect_vehicle(
                 saved_image_path
             )
+
+            if len(vehicle_type) > 0:
+                st.session_state["vehicle_type"] = vehicle_type[0]
 
             st.session_state["vehicle_detection"] = (
                 vehicle_detection_image
             )
 
             if len(vehicle_images) > 0:
-
+            
                 st.session_state["vehicle_crop"] = (
-                    vehicle_images[0]
+                    vehicle_images
                 )
 
             # ----------------------------------------
@@ -381,8 +409,10 @@ if process_button:
             if len(plate_detection_images) > 0:
 
                 st.session_state["plate_detection"] = (
-                    plate_detection_images[0]
+                    plate_detection_images
                 )
+
+                    
 
             if len(plate_images) > 0:
 
@@ -416,6 +446,7 @@ if process_button:
 
                 plate_number = ocr_records[0]["plate_number"]
 
+            layout_vehicle_type = "car"
             if plate_number != "":
 
                 # -------------------------
@@ -424,21 +455,18 @@ if process_button:
 
                 if is_vehicle_inside(plate_number):
 
-                    assigned_slot = get_assigned_slot(
-                        plate_number
+                    vehicle_record = get_vehicle(plate_number)
+                    layout_vehicle_type = VEHICLE_LAYOUT_MAP.get(
+                        vehicle_record["vehicle_type"], "car"
                     )
+
+                    assigned_slot = get_assigned_slot(plate_number)
 
                     if assigned_slot:
+                        free_slot(assigned_slot, layout_vehicle_type)
 
-                        free_slot(assigned_slot)
-
-                    update_exit_time(
-                        plate_number
-                    )
-
-                    remove_slot(
-                        plate_number
-                    )
+                    update_exit_time(plate_number)
+                    remove_slot(plate_number)
 
                     st.session_state["assigned_slot"] = assigned_slot
 
@@ -448,18 +476,19 @@ if process_button:
 
                 else:
 
-                    add_vehicle(plate_number)
+                    add_vehicle(plate_number, st.session_state["vehicle_type"])
 
-                    assigned_slot = allocate_parking()
+                    layout_vehicle_type = VEHICLE_LAYOUT_MAP.get(
+                        st.session_state["vehicle_type"], "car"
+                    )
+
+                    assigned_slot = allocate_parking(layout_vehicle_type)
 
                     if assigned_slot is None:
                         st.error("Parking is full.")
                         st.stop()
 
-                    assign_slot(
-                        plate_number,
-                        assigned_slot
-                    )
+                    assign_slot(plate_number, assigned_slot)
 
                     st.session_state["assigned_slot"] = assigned_slot
 
@@ -468,7 +497,7 @@ if process_button:
                 # UPDATE PARKING IMAGE
                 # ----------------------------------------
 
-                updated_layout = draw_parking_layout()
+                updated_layout = draw_parking_layout(layout_vehicle_type)
 
                 st.session_state["parking_layout"] = updated_layout
 
@@ -570,6 +599,7 @@ st.subheader("🚙 Vehicle Information")
 info1, info2, info3 = st.columns(3)
 
 plate_number = "--"
+vehicle_type = "--"
 confidence = "--"
 status = "--"
 entry_time = "--"
@@ -609,6 +639,8 @@ if (
 
         vehicle = vehicle.iloc[-1]
 
+        vehicle_type = vehicle["vehicle_type"]
+
         entry_time = vehicle["entry_time"]
 
         exit_time = vehicle["exit_time"]
@@ -625,6 +657,9 @@ if st.session_state["assigned_slot"]:
 
     slot = st.session_state["assigned_slot"]
 
+if st.session_state["vehicle_type"]:
+    vehicle_type = st.session_state["vehicle_type"]
+
 # ---------------------------------------
 # DISPLAY
 # ---------------------------------------
@@ -635,6 +670,11 @@ with info1:
         "Plate Number",
         plate_number
     )
+
+    st.metric(
+    "Vehicle Type",
+    vehicle_type
+)
 
     st.metric(
         "Vehicle Status",
@@ -695,6 +735,7 @@ if not vehicle_df.empty:
     vehicle_df = vehicle_df.rename(
         columns={
             "plate_number": "Plate Number",
+            "vehicle_type": "Vehicle Type",
             "assigned_slot": "Assigned Slot",
             "entry_time": "Entry Time",
             "exit_time": "Exit Time",

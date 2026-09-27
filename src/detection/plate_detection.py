@@ -3,8 +3,7 @@ import cv2
 from ultralytics import YOLO
 
 # Load model only once
-model = YOLO("models/best.pt")
-
+model = YOLO("models/plate_detection_model.pt")
 
 def detect_plate(
     vehicle_image_paths,
@@ -62,12 +61,12 @@ def detect_plate(
                     plate_folder,
                     filename
                 )
+                # processed_plate = preprocess_plate(plate)
 
                 cv2.imwrite(
                     plate_path,
                     plate
                 )
-
                 plate_image_paths.append(
                     plate_path
                 )
