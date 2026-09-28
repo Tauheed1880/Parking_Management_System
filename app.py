@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 
+import cv2
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -59,8 +61,6 @@ with open("assets/style.css") as css:
 # CONSTANT PATHS
 # -----------------------------
 
-TEMP_FOLDER = "temp"
-
 PARKING_LAYOUT_CSV = "output/parking_layout/parking_layout.csv"
 
 VEHICLE_DATABASE = "data/vehicles.csv"
@@ -75,8 +75,6 @@ VEHICLE_LAYOUT_MAP = {
     "bus": "bus",
     "truck": "bus",
 }
-
-os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 # -----------------------------
 # HELPER FUNCTIONS
@@ -302,17 +300,14 @@ uploaded_file = st.file_uploader(
     label_visibility="collapsed"
 )
 
-saved_image_path = None
+uploaded_image = None
 
 if uploaded_file is not None:
 
-    saved_image_path = os.path.join(
-        TEMP_FOLDER,
-        uploaded_file.name
+    uploaded_image = cv2.imdecode(
+        np.frombuffer(uploaded_file.getbuffer(), dtype=np.uint8),
+        cv2.IMREAD_COLOR
     )
-
-    with open(saved_image_path, "wb") as file:
-        file.write(uploaded_file.getbuffer())
 
 
 # ----------------------------------------------------------
@@ -364,7 +359,7 @@ for key, value in defaults.items():
 
 if process_button:
 
-    if saved_image_path is None:
+    if uploaded_image is None:
 
         st.warning("Please upload an image.")
 
@@ -372,8 +367,8 @@ if process_button:
 
         with st.spinner("Processing Vehicle..."):
 
-            # Save uploaded image
-            st.session_state["uploaded_image"] = saved_image_path
+            # Keep the uploaded original in memory.
+            st.session_state["uploaded_image"] = uploaded_image.copy()
 
             # ----------------------------------------
             # STEP 1
@@ -381,7 +376,8 @@ if process_button:
             # ----------------------------------------
 
             vehicle_detection_image, vehicle_images, vehicle_type = detect_vehicle(
-                saved_image_path
+                uploaded_image,
+                uploaded_file.name
             )
 
             if len(vehicle_type) > 0:
@@ -521,10 +517,11 @@ with left:
 
     st.subheader("📷 Uploaded Vehicle")
 
-    if st.session_state["uploaded_image"]:
+    if st.session_state["uploaded_image"] is not None:
 
         st.image(
             st.session_state["uploaded_image"],
+            channels="BGR",
             use_container_width=True
         )
 

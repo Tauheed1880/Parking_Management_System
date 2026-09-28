@@ -13,7 +13,8 @@ VEHICLE_CLASS_NAMES = {
 }
 
 def detect_vehicle(
-    image_path,
+    image,
+    image_name="uploaded_image.jpg",
     vehicle_folder="output/vehicle_crops",
     bounding_box_folder="output/vehicle_bounding_boxes"
 ):
@@ -29,12 +30,11 @@ def detect_vehicle(
     os.makedirs(vehicle_folder, exist_ok=True)
     os.makedirs(bounding_box_folder, exist_ok=True)
 
-    frame = cv2.imread(image_path)
+    if image is None:
+        raise Exception("Unable to decode uploaded image.")
 
-    if frame is None:
-        raise Exception(f"Unable to read image: {image_path}")
-
-    filename = os.path.basename(image_path)
+    frame = image
+    filename = os.path.basename(image_name)
 
     print(f"\nProcessing: {filename}")
 
