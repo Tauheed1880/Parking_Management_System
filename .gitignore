@@ -6,3 +6,4 @@ temp/
 output/
 tempCodeRunnerFile.py
 *.python
+*.vscode
