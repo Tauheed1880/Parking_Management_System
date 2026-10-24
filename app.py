@@ -33,7 +33,8 @@ from src.parking.vehicle_database import (
     update_exit_time,
     remove_slot,
     add_vehicle,
-    get_vehicle
+    get_vehicle,
+    load_database as load_vehicle_records,
 )
 
 # -----------------------------
@@ -63,8 +64,6 @@ with open("assets/style.css") as css:
 # -----------------------------
 
 PARKING_LAYOUT_CSV = "output/parking_layout/parking_layout.csv"
-
-VEHICLE_DATABASE = "data/vehicles.csv"
 
 OCR_RESULTS = "output/ocr_results/plate_results.csv"
 
@@ -114,11 +113,7 @@ def load_parking_layout():
 
 
 def load_vehicle_database():
-
-    if os.path.exists(VEHICLE_DATABASE):
-        return pd.read_csv(VEHICLE_DATABASE, dtype=str).fillna("")
-
-    return pd.DataFrame()
+    return load_vehicle_records()
 
 
 def load_ocr_results():

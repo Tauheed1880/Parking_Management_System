@@ -1,67 +1,47 @@
+from pathlib import Path
+
 import cv2
-import pandas as pd
 
-# # Original parking image (without boxes)
-# IMAGE_PATH = "output/parking_layout/base_layout.jpg"
+from src.parking.parking_reconciliation import (
+    PROJECT_ROOT,
+    canonical_layout_path,
+    reconcile_layout,
+)
 
-# # Parking layout CSV
-# CSV_PATH = "output/parking_layout/parking_layout.csv"
 
-# # Output image
-# OUTPUT_PATH = "output/parking_layout/parking_layout.jpg"
+OUTPUT_FOLDER = PROJECT_ROOT / "output" / "parking_layout"
 
-OUTPUT_FOLDER = "output/parking_layout"
 
-def draw_parking_layout(vehicle_type):
-
-    image_path = f"{OUTPUT_FOLDER}/{vehicle_type}_base_layout.jpg"
-    csv_path = f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.csv"
-    output_path = f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.jpg"
-
-    image = cv2.imread(image_path)
-
+def draw_parking_layout(vehicle_type, highlighted_slot=None):
+    """Render stored model slots with live assignments on the canonical image."""
+    result = reconcile_layout(vehicle_type)
+    category = result["category"]
+    image = cv2.imread(str(canonical_layout_path(category)))
     if image is None:
-        print("Could not load parking image.")
-        return None
+        raise FileNotFoundError(f"Canonical {category} layout image cannot be read.")
 
-    df = pd.read_csv(csv_path)
+    for slot in result["slots"].itertuples(index=False):
+        x1, y1, x2, y2 = (int(round(value)) for value in (slot.x1, slot.y1, slot.x2, slot.y2))
+        color = (0, 255, 0) if slot.status == "empty" else (0, 0, 255)
+        is_highlighted = str(slot.slot) == str(highlighted_slot or "")
 
-    for _, row in df.iterrows():
-
-        x1 = int(row["x1"])
-        y1 = int(row["y1"])
-        x2 = int(row["x2"])
-        y2 = int(row["y2"])
-
-        slot = row["slot"]
-        status = row["status"]
-
-        if status == "empty":
-            color = (0, 255, 0)
-        else:
-            color = (0, 0, 255)
-
-        cv2.rectangle(
-            image,
-            (x1, y1),
-            (x2, y2),
-            color,
-            2
-        )
-
+        if is_highlighted:
+            cv2.rectangle(image, (x1 - 3, y1 - 3), (x2 + 3, y2 + 3), (255, 0, 0), 4)
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        label_y = max(16, y1 - 5)
         cv2.putText(
             image,
-            slot,
-            (x1, y1 - 5),
+            str(slot.slot),
+            (x1, label_y),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.45,
             color,
-            1
+            1,
+            cv2.LINE_AA,
         )
 
-    cv2.imwrite(output_path, image)
-
-    print("Parking layout updated.")
-    print(output_path)
-
-    return output_path
+    output_path = OUTPUT_FOLDER / f"{category}_live_layout.jpg"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if not cv2.imwrite(str(output_path), image):
+        raise OSError(f"Could not write annotated {category} layout image.")
+    return str(output_path)

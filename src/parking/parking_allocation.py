@@ -7,17 +7,21 @@ def get_csv_path(vehicle_type):
     return f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.csv"
 
 
-def load_parking_layout(vehicle_type):
-    return pd.read_csv(get_csv_path(vehicle_type))
+def load_parking_layout(vehicle_type, csv_path=None):
+    return pd.read_csv(csv_path or get_csv_path(vehicle_type))
 
 
 def save_parking_layout(df, vehicle_type):
     df.to_csv(get_csv_path(vehicle_type), index=False)
 
 
-def get_best_parking_slot(vehicle_type):
+def get_best_parking_slot(vehicle_type, csv_path=None, parking_df=None):
 
-    df = load_parking_layout(vehicle_type)
+    df = (
+        parking_df.copy()
+        if parking_df is not None
+        else load_parking_layout(vehicle_type, csv_path)
+    )
 
     best_slot = None
     longest_sequence = 0

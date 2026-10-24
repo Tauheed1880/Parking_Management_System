@@ -2,7 +2,13 @@ venv/
 __pycache__/
 *.pyc
 temp/
-output/
+output/*
 tempCodeRunnerFile.py
 *.python
 *.vscode
+/database/smart_parking.db
+uploads/
+!output/parking_layout/
+output/parking_layout/*
+!output/parking_layout/*_base_layout.jpg
+backup_old_data/

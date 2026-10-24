@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart Parking Management System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/app.js" defer></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>Smart Parking</strong>
+        <span>Management System</span>
+      </div>
+      <nav class="navigation" aria-label="Main navigation">
+        <button class="nav-item active" type="button" data-page-nav="dashboard">Dashboard</button>
+        <button class="nav-item" type="button" data-page-nav="detection">Vehicle Detection</button>
+        <button class="nav-item" type="button" data-page-nav="records">Vehicle Records</button>
+        <button class="nav-item" type="button" data-page-nav="layout">Parking Layout</button>
+        <button class="nav-item" type="button" data-page-nav="reports">Parking History / Reports</button>
+      </nav>
+      <div class="sidebar-note">FastAPI parking dashboard</div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="page-header">
+        <div>
+          <p class="page-kicker">Smart Parking Management System</p>
+          <h1 id="page-title">Dashboard</h1>
+          <p id="page-subtitle" class="page-subtitle">Current parking activity and capacity.</p>
+        </div>
+        <div class="header-status">
+          <span class="online-indicator"><span class="online-dot"></span>Online</span>
+          <time id="live-clock"></time>
+        </div>
+      </header>
+
+      <div id="global-feedback" class="feedback" role="status" hidden></div>
+
+      <section class="page-section" data-page="dashboard">
+        <div class="metric-grid four-columns">
+          <article class="metric-card"><span>Total Slots</span><strong id="summary-total">—</strong></article>
+          <article class="metric-card"><span>Occupied</span><strong id="summary-occupied">—</strong></article>
+          <article class="metric-card"><span>Available</span><strong id="summary-available">—</strong></article>
+          <article class="metric-card"><span>Occupancy</span><strong id="summary-percent">—</strong></article>
+        </div>
+
+        <article class="panel progress-panel">
+          <div class="panel-heading"><h2>Parking occupancy</h2><span id="summary-progress-label">Loading summary</span></div>
+          <div class="progress-track" role="progressbar" aria-label="Parking occupancy" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="summary-progress" class="progress-fill"></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Vehicles Currently Inside</h2><p>Active records from SQLite</p></div></div>
+          <div class="metric-grid three-columns">
+            <article class="metric-card compact"><span>Cars</span><strong id="inside-cars">—</strong></article>
+            <article class="metric-card compact"><span>Buses</span><strong id="inside-buses">—</strong></article>
+            <article class="metric-card compact"><span>Motorcycles</span><strong id="inside-motorcycles">—</strong></article>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Recent Activity</h2><p>Latest eight vehicle records</p></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Plate</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Status</th></tr></thead>
+              <tbody id="recent-activity-body"><tr><td class="empty-cell" colspan="5">Loading records</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="page-section" data-page="detection" hidden>
+        <article class="panel upload-panel">
+          <div class="panel-heading"><div><h2>Upload Vehicle Image</h2><p>Supported formats: JPG, JPEG, PNG</p></div></div>
+          <form id="vehicle-form">
+            <label for="vehicle-image">Vehicle image</label>
+            <div class="upload-controls">
+              <input id="vehicle-image" name="file" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+              <button id="process-button" class="primary-button" type="submit">Process Vehicle</button>
+            </div>
+          </form>
+          <div id="process-spinner" class="loading-row" role="status" hidden><span class="spinner"></span><span>Processing vehicle image…</span></div>
+          <div id="detection-feedback" class="feedback" role="alert" hidden></div>
+        </article>
+
+        <div class="results-grid">
+          <article class="panel result-panel">
+            <h2>Original Image</h2>
+            <div class="media-frame"><img id="image-original" alt="Uploaded vehicle"><p class="media-placeholder">Original image will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel">
+            <h2>Detected Vehicle Image</h2>
+            <div class="media-frame"><img id="image-vehicle-detection" alt="Detected vehicle"><p class="media-placeholder">Vehicle detection result will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Detected Vehicle Type</h2>
+            <p id="detected-vehicle-type" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel">
+            <h2>Detected License Plate</h2>
+            <div class="media-frame"><img id="image-plate-detection" alt="License plate detection"><p class="media-placeholder">License plate detection will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel">
+            <h2>Plate Crop</h2>
+            <div class="media-frame"><img id="image-plate-crop" alt="License plate crop"><p class="media-placeholder">Plate crop will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Plate Number</h2>
+            <p id="detected-plate-number" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>OCR Confidence</h2>
+            <p id="ocr-confidence" class="large-value">Will appear here after processing.</p>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Vehicle Information</h2><p>Latest matching vehicle record</p></div></div>
+          <dl class="information-grid">
+            <div><dt>Plate</dt><dd id="info-plate">Will appear here after processing.</dd></div>
+            <div><dt>Vehicle Type</dt><dd id="info-type">—</dd></div>
+            <div><dt>Status</dt><dd id="info-status">—</dd></div>
+            <div><dt>Entry Time</dt><dd id="info-entry">—</dd></div>
+            <div><dt>Assigned Slot</dt><dd id="info-slot">—</dd></div>
+            <div><dt>Exit Time</dt><dd id="info-exit">—</dd></div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="page-section" data-page="records" hidden>
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Vehicle Records</h2><p>Search and filter SQLite history</p></div><span id="records-count" class="quiet-label"></span></div>
+          <div class="filter-row">
+            <label>Search by plate<input id="record-search" type="search" placeholder="Enter plate number"></label>
+            <label>Vehicle type<select id="record-type-filter"><option value="all">All types</option></select></label>
+            <label>Status<select id="record-status-filter"><option value="all">All statuses</option></select></label>
+          </div>
+          <div id="records-feedback" class="feedback" role="status" hidden></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Plate</th><th>Type</th><th>Entry</th><th>Slot</th><th>Status</th><th>Exit</th></tr></thead>
+              <tbody id="vehicle-records-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="page-section" data-page="layout" hidden>
+        <article class="panel layout-panel">
+          <div class="panel-heading"><div><h2>Parking Layout</h2><p>Live slot status from conservative reconciliation</p></div></div>
+          <div class="layout-tabs" role="tablist" aria-label="Vehicle parking layout">
+            <button class="layout-tab active" type="button" role="tab" aria-selected="true" data-layout-tab="car">Car Parking</button>
+            <button class="layout-tab" type="button" role="tab" aria-selected="false" data-layout-tab="bus">Bus Parking</button>
+            <button class="layout-tab" type="button" role="tab" aria-selected="false" data-layout-tab="motorcycle">Motorcycle Parking</button>
+          </div>
+          <div id="layout-feedback" class="feedback" role="status" hidden></div>
+          <div class="layout-counts">
+            <article class="metric-card compact"><span>Total Slots</span><strong id="layout-total">—</strong></article>
+            <article class="metric-card compact"><span>Occupied</span><strong id="layout-occupied">—</strong></article>
+            <article class="metric-card compact"><span>Available</span><strong id="layout-available">—</strong></article>
+          </div>
+          <div class="layout-image-wrap"><img id="layout-image" alt="Selected parking layout" hidden><p id="layout-image-placeholder" class="media-placeholder">Layout image will appear when the layout loads.</p></div>
+          <div id="slot-grid" class="slot-groups"></div>
+          <div class="layout-legend"><span><i class="legend-dot available"></i>Available</span><span><i class="legend-dot occupied"></i>Occupied</span><span><i class="legend-dot assigned"></i>Just assigned</span></div>
+        </article>
+      </section>
+
+      <section class="page-section" data-page="reports" hidden>
+        <div class="metric-grid four-columns">
+          <article class="metric-card"><span>Vehicle Entries</span><strong id="report-entries">—</strong></article>
+          <article class="metric-card"><span>Vehicle Exits</span><strong id="report-exits">—</strong></article>
+          <article class="metric-card"><span>Currently Inside</span><strong id="report-inside">—</strong></article>
+          <article class="metric-card"><span>Previous Parking Records</span><strong id="report-previous">—</strong></article>
+        </div>
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Completed Parking Sessions</h2><p>Exited records with calculated parking duration</p></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Plate</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Exit Time</th><th>Duration</th></tr></thead>
+              <tbody id="completed-sessions-body"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+      <footer class="page-footer">Smart Parking Management System</footer>
+    </main>
+  </body>
+</html>

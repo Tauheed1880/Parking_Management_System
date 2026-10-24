@@ -8,3 +8,6 @@ paddleocr
 torch
 torchvision
 matplotlib
+fastapi
+uvicorn
+python-multipart
