@@ -15,7 +15,8 @@
       </div>
       <nav class="navigation" aria-label="Main navigation">
         <button class="nav-item active" type="button" data-page-nav="dashboard">Dashboard</button>
-        <button class="nav-item" type="button" data-page-nav="detection">Vehicle Detection</button>
+        <button class="nav-item" type="button" data-page-nav="entry">Vehicle Entry</button>
+        <button class="nav-item" type="button" data-page-nav="exit">Vehicle Exit</button>
         <button class="nav-item" type="button" data-page-nav="records">Vehicle Records</button>
         <button class="nav-item" type="button" data-page-nav="layout">Parking Layout</button>
         <button class="nav-item" type="button" data-page-nav="reports">Parking History / Reports</button>
@@ -66,68 +67,163 @@
           <div class="panel-heading"><div><h2>Recent Activity</h2><p>Latest eight vehicle records</p></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Plate</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Status</th></tr></thead>
-              <tbody id="recent-activity-body"><tr><td class="empty-cell" colspan="5">Loading records</td></tr></tbody>
+              <thead><tr><th>Plate</th><th>Province</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Status</th></tr></thead>
+              <tbody id="recent-activity-body"><tr><td class="empty-cell" colspan="6">Loading records</td></tr></tbody>
             </table>
           </div>
         </article>
       </section>
 
-      <section class="page-section" data-page="detection" hidden>
+      <section class="page-section" data-page="entry" hidden>
         <article class="panel upload-panel">
-          <div class="panel-heading"><div><h2>Upload Vehicle Image</h2><p>Supported formats: JPG, JPEG, PNG</p></div></div>
-          <form id="vehicle-form">
-            <label for="vehicle-image">Vehicle image</label>
+          <div class="panel-heading"><div><h2>Vehicle Entry</h2><p>Upload incoming vehicle image to assign parking slot</p></div></div>
+          <form id="entry-form">
+            <label for="entry-vehicle-image">Incoming vehicle image</label>
             <div class="upload-controls">
-              <input id="vehicle-image" name="file" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
-              <button id="process-button" class="primary-button" type="submit">Process Vehicle</button>
+              <input id="entry-vehicle-image" name="file" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+              <button id="entry-process-button" class="primary-button" type="submit">Register Entry</button>
             </div>
           </form>
-          <div id="process-spinner" class="loading-row" role="status" hidden><span class="spinner"></span><span>Processing vehicle image…</span></div>
-          <div id="detection-feedback" class="feedback" role="alert" hidden></div>
+          <div id="entry-process-spinner" class="loading-row" role="status" hidden><span class="spinner"></span><span>Processing entry image…</span></div>
+          <div id="entry-detection-feedback" class="feedback" role="alert" hidden></div>
         </article>
 
         <div class="results-grid">
           <article class="panel result-panel">
             <h2>Original Image</h2>
-            <div class="media-frame"><img id="image-original" alt="Uploaded vehicle"><p class="media-placeholder">Original image will appear here after processing.</p></div>
+            <div class="media-frame"><img id="entry-image-original" alt="Uploaded vehicle"><p class="media-placeholder">Original image will appear here after processing.</p></div>
           </article>
           <article class="panel result-panel">
             <h2>Detected Vehicle Image</h2>
-            <div class="media-frame"><img id="image-vehicle-detection" alt="Detected vehicle"><p class="media-placeholder">Vehicle detection result will appear here after processing.</p></div>
+            <div class="media-frame"><img id="entry-image-vehicle-detection" alt="Detected vehicle"><p class="media-placeholder">Vehicle detection result will appear here after processing.</p></div>
           </article>
           <article class="panel result-panel text-result">
             <h2>Detected Vehicle Type</h2>
-            <p id="detected-vehicle-type" class="large-value">Will appear here after processing.</p>
+            <p id="entry-detected-vehicle-type" class="large-value">Will appear here after processing.</p>
           </article>
           <article class="panel result-panel">
             <h2>Detected License Plate</h2>
-            <div class="media-frame"><img id="image-plate-detection" alt="License plate detection"><p class="media-placeholder">License plate detection will appear here after processing.</p></div>
+            <div class="media-frame"><img id="entry-image-plate-detection" alt="License plate detection"><p class="media-placeholder">License plate detection will appear here after processing.</p></div>
           </article>
           <article class="panel result-panel">
             <h2>Plate Crop</h2>
-            <div class="media-frame"><img id="image-plate-crop" alt="License plate crop"><p class="media-placeholder">Plate crop will appear here after processing.</p></div>
+            <div class="media-frame"><img id="entry-image-plate-crop" alt="License plate crop"><p class="media-placeholder">Plate crop will appear here after processing.</p></div>
           </article>
           <article class="panel result-panel text-result">
             <h2>Plate Number</h2>
-            <p id="detected-plate-number" class="large-value">Will appear here after processing.</p>
+            <p id="entry-detected-plate-number" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Province</h2>
+            <p id="entry-detected-province" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Assigned Slot</h2>
+            <p id="entry-assigned-slot-display" class="large-value" style="color: var(--available);">Will appear here after processing.</p>
           </article>
           <article class="panel result-panel text-result">
             <h2>OCR Confidence</h2>
-            <p id="ocr-confidence" class="large-value">Will appear here after processing.</p>
+            <p id="entry-ocr-confidence" class="large-value">Will appear here after processing.</p>
           </article>
         </div>
 
         <article class="panel">
-          <div class="panel-heading"><div><h2>Vehicle Information</h2><p>Latest matching vehicle record</p></div></div>
+          <div class="panel-heading"><div><h2>Vehicle Entry Information</h2><p>Saved vehicle registration record</p></div></div>
           <dl class="information-grid">
-            <div><dt>Plate</dt><dd id="info-plate">Will appear here after processing.</dd></div>
-            <div><dt>Vehicle Type</dt><dd id="info-type">—</dd></div>
-            <div><dt>Status</dt><dd id="info-status">—</dd></div>
-            <div><dt>Entry Time</dt><dd id="info-entry">—</dd></div>
-            <div><dt>Assigned Slot</dt><dd id="info-slot">—</dd></div>
-            <div><dt>Exit Time</dt><dd id="info-exit">—</dd></div>
+            <div><dt>Plate</dt><dd id="entry-info-plate">Will appear here after processing.</dd></div>
+            <div><dt>Province</dt><dd id="entry-info-province">—</dd></div>
+            <div><dt>Vehicle Type</dt><dd id="entry-info-type">—</dd></div>
+            <div><dt>Status</dt><dd id="entry-info-status">—</dd></div>
+            <div><dt>Entry Time</dt><dd id="entry-info-entry">—</dd></div>
+            <div><dt>Assigned Slot</dt><dd id="entry-info-slot">—</dd></div>
           </dl>
+        </article>
+      </section>
+
+      <section class="page-section" data-page="exit" hidden>
+        <article class="panel upload-panel">
+          <div class="panel-heading"><div><h2>Vehicle Exit</h2><p>Upload departing vehicle image to verify fee and authorize departure</p></div></div>
+          <form id="exit-form">
+            <label for="exit-vehicle-image">Departing vehicle image</label>
+            <div class="upload-controls">
+              <input id="exit-vehicle-image" name="file" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required>
+              <button id="exit-process-button" class="primary-button" type="submit">Verify Exit</button>
+            </div>
+          </form>
+          <div id="exit-process-spinner" class="loading-row" role="status" hidden><span class="spinner"></span><span>Processing exit image…</span></div>
+          <div id="exit-detection-feedback" class="feedback" role="alert" hidden></div>
+        </article>
+
+        <div id="exit-auth-banner" class="auth-banner blocked" hidden>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span id="exit-auth-badge" class="badge-blocked">Payment Blocked</span>
+            <span id="exit-auth-msg">Payment required before exit.</span>
+          </div>
+          <div id="exit-banner-actions">
+            <button id="exit-banner-settle-btn" class="primary-button" type="button" style="min-height: 32px; padding: 4px 12px; font-size: 0.8rem;">Admin Settle Payment</button>
+            <button id="exit-banner-confirm-btn" class="primary-button" type="button" style="min-height: 32px; padding: 4px 12px; font-size: 0.8rem; background: #2d704e; border-color: #2d704e;" hidden>Confirm Departure</button>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <article class="panel result-panel">
+            <h2>Original Image</h2>
+            <div class="media-frame"><img id="exit-image-original" alt="Uploaded vehicle"><p class="media-placeholder">Original image will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel">
+            <h2>Detected Vehicle Image</h2>
+            <div class="media-frame"><img id="exit-image-vehicle-detection" alt="Detected vehicle"><p class="media-placeholder">Vehicle detection result will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Detected Vehicle Type</h2>
+            <p id="exit-detected-vehicle-type" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel">
+            <h2>Detected License Plate</h2>
+            <div class="media-frame"><img id="exit-image-plate-detection" alt="License plate detection"><p class="media-placeholder">License plate detection will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel">
+            <h2>Plate Crop</h2>
+            <div class="media-frame"><img id="exit-image-plate-crop" alt="License plate crop"><p class="media-placeholder">Plate crop will appear here after processing.</p></div>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Plate Number</h2>
+            <p id="exit-detected-plate-number" class="large-value">Will appear here after processing.</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Exit Authorization</h2>
+            <p id="exit-auth-status-card" class="large-value">—</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>Total Fee Due</h2>
+            <p id="exit-total-fee-card" class="large-value">—</p>
+          </article>
+          <article class="panel result-panel text-result">
+            <h2>OCR Confidence</h2>
+            <p id="exit-ocr-confidence" class="large-value">Will appear here after processing.</p>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-heading"><div><h2>Vehicle Exit & Fee Information</h2><p>Latest exit session and payment details</p></div></div>
+          <dl class="information-grid">
+            <div><dt>Plate</dt><dd id="exit-info-plate">Will appear here after processing.</dd></div>
+            <div><dt>Province</dt><dd id="exit-info-province">—</dd></div>
+            <div><dt>Vehicle Type</dt><dd id="exit-info-type">—</dd></div>
+            <div><dt>Status</dt><dd id="exit-info-status">—</dd></div>
+            <div><dt>Entry Time</dt><dd id="exit-info-entry">—</dd></div>
+            <div><dt>Assigned Slot</dt><dd id="exit-info-slot">—</dd></div>
+            <div><dt>Exit Time</dt><dd id="exit-info-exit">Not Exited (Pending Payment)</dd></div>
+            <div><dt>Duration</dt><dd id="exit-info-duration">—</dd></div>
+            <div><dt>Base Fee</dt><dd id="exit-info-base-fee">—</dd></div>
+            <div><dt>Additional Fee</dt><dd id="exit-info-additional-fee">—</dd></div>
+            <div><dt>Total Fee</dt><dd id="exit-info-total-fee">—</dd></div>
+            <div><dt>Payment Status</dt><dd id="exit-info-payment-status">—</dd></div>
+          </dl>
+          <div id="exit-actions" style="margin-top: 14px; display: flex; gap: 10px; align-items: center;" hidden>
+            <button id="exit-settle-btn" class="primary-button" type="button" hidden>Admin Settle Payment</button>
+            <button id="exit-confirm-btn" class="primary-button" type="button" style="background: #2d704e; border-color: #2d704e;" hidden>Confirm Departure (Release Slot)</button>
+          </div>
         </article>
       </section>
 
@@ -142,7 +238,7 @@
           <div id="records-feedback" class="feedback" role="status" hidden></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Plate</th><th>Type</th><th>Entry</th><th>Slot</th><th>Status</th><th>Exit</th></tr></thead>
+              <thead><tr><th>Plate</th><th>Province</th><th>Type</th><th>Entry</th><th>Slot</th><th>Status</th><th>Exit</th><th>Total Fee</th><th>Payment</th><th>Action</th></tr></thead>
               <tbody id="vehicle-records-body"></tbody>
             </table>
           </div>
@@ -180,7 +276,7 @@
           <div class="panel-heading"><div><h2>Completed Parking Sessions</h2><p>Exited records with calculated parking duration</p></div></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Plate</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Exit Time</th><th>Duration</th></tr></thead>
+              <thead><tr><th>Plate</th><th>Type</th><th>Slot</th><th>Entry Time</th><th>Exit Time</th><th>Duration</th><th>Base Fee</th><th>Add. Fee</th><th>Total Fee</th><th>Payment</th><th>Action</th></tr></thead>
               <tbody id="completed-sessions-body"></tbody>
             </table>
           </div>

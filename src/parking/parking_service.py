@@ -9,7 +9,7 @@ import numpy as np
 from src.detection.ocr import read_plate
 from src.detection.plate_detection import detect_plate
 from src.detection.vehicle_detection import detect_vehicle
-from src.parking import parking_allocation, vehicle_database
+from src.parking import parking_allocation, parking_fee, vehicle_database
 from src.parking.draw_parking_layout import draw_parking_layout
 from src.parking.parking_reconciliation import (
     ParkingError,
@@ -65,7 +65,7 @@ def _allocate_from_snapshot(category, reconciliation):
     )
 
 
-def process_vehicle_image(contents, original_filename):
+def process_vehicle_image(contents, original_filename, mode="auto"):
     with PROCESS_LOCK:
         encoded = np.frombuffer(contents, dtype=np.uint8)
         image = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
@@ -120,7 +120,17 @@ def process_vehicle_image(contents, original_filename):
             plate_images,
         )
 
-        if vehicle_database.is_vehicle_inside(plate_number):
+        is_inside = vehicle_database.is_vehicle_inside(plate_number)
+
+        # Mode validation
+        if mode == "entry" and is_inside:
+            raise ParkingError("assignment_conflict", f"Vehicle {plate_number} is already recorded as inside.", 409)
+        if mode == "exit" and not is_inside:
+            raise ParkingError("vehicle_not_inside", f"Vehicle {plate_number} is not recorded as inside.", 404)
+
+        should_exit = (mode == "exit") or (mode == "auto" and is_inside)
+
+        if should_exit:
             vehicle_record = vehicle_database.get_vehicle(plate_number)
             if vehicle_record is None:
                 raise ParkingError("assignment_conflict", "The active vehicle record could not be read.", 409)
@@ -134,15 +144,53 @@ def process_vehicle_image(contents, original_filename):
             if assigned_slot not in set(reconciliation["slots"]["slot"].astype(str)):
                 raise ParkingError("assignment_conflict", "The active slot is not present in the selected layout.", 409)
 
-            # Keep the active slot protected during inference, then record the explicit exit.
-            vehicle_database.update_exit_time(plate_number)
+            # 1. Calculate and update parking fee using current exit detection time
+            try:
+                assessment = vehicle_database.assess_exit_fee(plate_number)
+            except parking_fee.FeeCalculationError as exc:
+                raise ParkingError("fee_calculation_error", str(exc), 400)
+            except Exception as exc:
+                raise ParkingError("exit_error", f"Fee assessment failed: {exc}", 500)
+
+            fee_record = assessment.get("fee") if assessment else None
+            payment_status = str(fee_record.get("payment_status", "Unpaid") if fee_record else "Unpaid").strip().lower()
+
+            # 2. When payment is Unpaid: block exit authorization, keep vehicle Inside, keep slot occupied
+            if payment_status != "paid":
+                reconciliation = reconcile_layout(stored_type)
+                return {
+                    "action": "exit_blocked",
+                    "exit_authorized": False,
+                    "status": "Payment Blocked",
+                    "message": "Payment required before exit.",
+                    "vehicle_type": detected_type,
+                    "plate_result": plate_result,
+                    "ocr_confidence": plate_result.get("confidence"),
+                    "images": images,
+                    "selected_layout": reconciliation["layout"],
+                    "assigned_slot": assigned_slot,
+                    "occupancy": reconciliation["occupancy"],
+                    "fee": fee_record,
+                }
+
+            # 3. When payment is Paid: allow exit authorization, finalize exit and release slot
+            try:
+                exit_result = vehicle_database.finalize_exit(plate_number)
+            except Exception as exc:
+                raise ParkingError("exit_error", f"Vehicle exit could not be finalized: {exc}", 500)
+
             reconciliation = reconcile_layout(stored_type)
             try:
                 draw_parking_layout(stored_category, assigned_slot)
             except Exception as exc:
                 raise ParkingError("layout_render_error", f"The live layout image could not be updated: {exc}", 500)
+
+            final_fee = exit_result.get("fee") if exit_result else fee_record
             return {
                 "action": "exit",
+                "exit_authorized": True,
+                "status": "Payment Paid - Exit Authorized",
+                "message": "Exit authorized. Parking slot released.",
                 "vehicle_type": detected_type,
                 "plate_result": plate_result,
                 "ocr_confidence": plate_result.get("confidence"),
@@ -150,6 +198,7 @@ def process_vehicle_image(contents, original_filename):
                 "selected_layout": reconciliation["layout"],
                 "assigned_slot": assigned_slot,
                 "occupancy": reconciliation["occupancy"],
+                "fee": final_fee,
             }
 
         assigned_slot = _allocate_from_snapshot(category, reconciliation)
@@ -176,14 +225,17 @@ def process_vehicle_image(contents, original_filename):
                 raise ParkingError("assignment_conflict", "This plate already has an active assignment.", 409)
 
         try:
-            vehicle_database.add_vehicle(
+            record_id = vehicle_database.add_vehicle(
                 plate_number,
                 detected_type,
                 assigned_slot=assigned_slot,
                 layout_id=category,
+                province=plate_result.get("province"),
             )
         except vehicle_database.AssignmentConflictError as exc:
             raise ParkingError("assignment_conflict", str(exc), 409)
+        except parking_fee.FeeCalculationError as exc:
+            raise ParkingError("fee_calculation_error", str(exc), 400)
         except Exception as exc:
             raise ParkingError("record_error", f"Vehicle record could not be saved: {exc}", 500)
 
@@ -196,6 +248,7 @@ def process_vehicle_image(contents, original_filename):
         except Exception as exc:
             raise ParkingError("layout_render_error", f"The live layout image could not be updated: {exc}", 500)
 
+        fee_record = parking_fee.get_fee_by_vehicle_record_id(record_id) if record_id else None
         return {
             "action": "entry",
             "vehicle_type": detected_type,
@@ -205,4 +258,13 @@ def process_vehicle_image(contents, original_filename):
             "selected_layout": reconciliation["layout"],
             "assigned_slot": assigned_slot,
             "occupancy": reconciliation["occupancy"],
+            "fee": fee_record,
         }
+
+
+def process_vehicle_entry(contents, original_filename):
+    return process_vehicle_image(contents, original_filename, mode="entry")
+
+
+def process_vehicle_exit(contents, original_filename):
+    return process_vehicle_image(contents, original_filename, mode="exit")

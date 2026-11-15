@@ -1,27 +1,6 @@
-import pandas as pd
-
-OUTPUT_FOLDER = "output/parking_layout"
-
-
-def get_csv_path(vehicle_type):
-    return f"{OUTPUT_FOLDER}/{vehicle_type}_parking_layout.csv"
-
-
-def load_parking_layout(vehicle_type, csv_path=None):
-    return pd.read_csv(csv_path or get_csv_path(vehicle_type))
-
-
-def save_parking_layout(df, vehicle_type):
-    df.to_csv(get_csv_path(vehicle_type), index=False)
-
-
-def get_best_parking_slot(vehicle_type, csv_path=None, parking_df=None):
-
-    df = (
-        parking_df.copy()
-        if parking_df is not None
-        else load_parking_layout(vehicle_type, csv_path)
-    )
+def get_best_parking_slot(vehicle_type, parking_df):
+    """Select the first slot in the longest consecutive empty row run."""
+    df = parking_df.copy()
 
     best_slot = None
     longest_sequence = 0
@@ -57,54 +36,3 @@ def get_best_parking_slot(vehicle_type, csv_path=None, parking_df=None):
         return None
 
     return best_slot["slot"]
-
-
-def occupy_slot(slot_id,vehicle_type):
-
-    df = load_parking_layout(vehicle_type)
-
-    index = df[df["slot"] == slot_id].index
-
-    if len(index) == 0:
-        return False
-
-    df.loc[index, "status"] = "occupied"
-
-    save_parking_layout(df,vehicle_type)
-
-    return True
-
-
-def free_slot(slot_id,vehicle_type):
-
-    df = load_parking_layout(vehicle_type)
-
-    index = df[df["slot"] == slot_id].index
-
-    if len(index) == 0:
-        return False
-
-    df.loc[index, "status"] = "empty"
-
-    save_parking_layout(df,vehicle_type)
-
-    return True
-
-
-def allocate_parking(vehicle_type):
-
-    slot = get_best_parking_slot(vehicle_type)
-
-    if slot is None:
-        return None
-
-    occupy_slot(slot,vehicle_type)
-
-    # # Update parking layout image
-    # draw_parking_layout()
-
-    print(f"Assigned Slot: {slot}")
-
-    return slot
-
-

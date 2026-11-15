@@ -13,6 +13,7 @@ VEHICLE_FIELDS = (
     "assigned_slot",
     "status",
     "layout_id",
+    "province",
 )
 SLOT_FIELDS = ("slot", "status", "row", "column", "x1", "y1", "x2", "y2")
 
@@ -64,10 +65,17 @@ def initialize_schema(db_path=None):
                 exit_time TEXT NOT NULL DEFAULT '',
                 assigned_slot TEXT NOT NULL DEFAULT '',
                 status TEXT NOT NULL CHECK (status IN ('Inside', 'Exited')),
-                layout_id TEXT NOT NULL REFERENCES layouts(type)
+                layout_id TEXT NOT NULL REFERENCES layouts(type),
+                province TEXT
             )
             """
         )
+        existing_cols = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(vehicle_records)").fetchall()
+        }
+        if "province" not in existing_cols:
+            connection.execute("ALTER TABLE vehicle_records ADD COLUMN province TEXT")
         connection.execute(
             """
             CREATE UNIQUE INDEX IF NOT EXISTS uq_vehicle_active_slot_layout
@@ -82,6 +90,57 @@ def initialize_schema(db_path=None):
             WHERE status = 'Inside'
             """
         )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS parking_fees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                vehicle_record_id INTEGER NOT NULL UNIQUE REFERENCES vehicle_records(id) ON DELETE CASCADE,
+                plate_number TEXT NOT NULL,
+                vehicle_type TEXT NOT NULL,
+                entry_time TEXT NOT NULL,
+                assessment_time TEXT,
+                exit_time TEXT,
+                duration_minutes INTEGER,
+                rate_base_fee REAL NOT NULL,
+                rate_additional_hourly REAL NOT NULL,
+                base_fee REAL,
+                additional_hours INTEGER,
+                additional_fee REAL,
+                total_fee REAL,
+                payment_status TEXT NOT NULL DEFAULT 'Unpaid' CHECK (payment_status IN ('Unpaid', 'Paid')),
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        existing_fee_cols = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(parking_fees)").fetchall()
+        }
+        if "assessment_time" not in existing_fee_cols:
+            connection.execute("ALTER TABLE parking_fees ADD COLUMN assessment_time TEXT")
+
+        # Ensure active vehicles ('Inside') have exit_time as NULL and assessment_time populated if needed
+        connection.execute(
+            """
+            UPDATE parking_fees
+            SET assessment_time = COALESCE(assessment_time, exit_time),
+                exit_time = NULL
+            WHERE vehicle_record_id IN (
+                SELECT id FROM vehicle_records WHERE status = 'Inside'
+            ) AND exit_time IS NOT NULL
+            """
+        )
+        connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_parking_fees_plate_number
+            ON parking_fees(plate_number)
+            """
+        )
+        try:
+            from src.parking.parking_fee import backfill_existing_records
+            backfill_existing_records(connection)
+        except Exception:
+            pass
         connection.commit()
     finally:
         connection.close()

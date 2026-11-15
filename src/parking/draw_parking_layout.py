@@ -20,6 +20,18 @@ def draw_parking_layout(vehicle_type, highlighted_slot=None):
     if image is None:
         raise FileNotFoundError(f"Canonical {category} layout image cannot be read.")
 
+    if category == "bus":
+        scale_ratio = image.shape[1] / 900.0
+        font_scale = 0.45 * scale_ratio
+        font_thickness = max(1, int(round(scale_ratio)))
+        label_offset = int(round(5 * scale_ratio))
+        label_min_y = int(round(16 * scale_ratio))
+    else:
+        font_scale = 0.45
+        font_thickness = 1
+        label_offset = 5
+        label_min_y = 16
+
     for slot in result["slots"].itertuples(index=False):
         x1, y1, x2, y2 = (int(round(value)) for value in (slot.x1, slot.y1, slot.x2, slot.y2))
         color = (0, 255, 0) if slot.status == "empty" else (0, 0, 255)
@@ -28,15 +40,15 @@ def draw_parking_layout(vehicle_type, highlighted_slot=None):
         if is_highlighted:
             cv2.rectangle(image, (x1 - 3, y1 - 3), (x2 + 3, y2 + 3), (255, 0, 0), 4)
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
-        label_y = max(16, y1 - 5)
+        label_y = max(label_min_y, y1 - label_offset)
         cv2.putText(
             image,
             str(slot.slot),
             (x1, label_y),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.45,
+            font_scale,
             color,
-            1,
+            font_thickness,
             cv2.LINE_AA,
         )
 

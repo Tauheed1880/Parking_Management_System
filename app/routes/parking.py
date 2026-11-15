@@ -1,5 +1,7 @@
-from fastapi import APIRouter, File, UploadFile
+from typing import Optional
+from fastapi import APIRouter, File, Form, Header, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.parking.draw_parking_layout import draw_parking_layout
 from src.parking.parking_reconciliation import (
@@ -8,8 +10,18 @@ from src.parking.parking_reconciliation import (
     initialize_layouts,
     reconcile_layout,
 )
-from src.parking.parking_service import MAX_UPLOAD_BYTES, process_vehicle_image
-from src.parking import vehicle_database
+from src.parking.parking_service import (
+    MAX_UPLOAD_BYTES,
+    process_vehicle_entry,
+    process_vehicle_exit,
+    process_vehicle_image,
+)
+from src.parking import parking_fee, vehicle_database
+
+
+class PaymentActionRequest(BaseModel):
+    action: Optional[str] = None
+    admin_token: Optional[str] = None
 
 
 router = APIRouter(prefix="/api")
@@ -39,7 +51,10 @@ def error_response(error):
 
 
 @router.post("/process-vehicle")
-async def process_vehicle(file: UploadFile = File(...)):
+async def process_vehicle(
+    file: UploadFile = File(...),
+    mode: Optional[str] = Form("auto"),
+):
     filename = file.filename or ""
     extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in ALLOWED_EXTENSIONS:
@@ -56,7 +71,55 @@ async def process_vehicle(file: UploadFile = File(...)):
         )
 
     try:
-        result = process_vehicle_image(contents, filename)
+        result = process_vehicle_image(contents, filename, mode=mode or "auto")
+        return {"ok": True, "error": None, "data": result}
+    except ParkingError as error:
+        return error_response(error)
+
+
+@router.post("/process-entry")
+async def process_entry(file: UploadFile = File(...)):
+    filename = file.filename or ""
+    extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in ALLOWED_EXTENSIONS:
+        return error_response(
+            ParkingError("invalid_upload", "Upload a JPG, JPEG, or PNG image.", 415)
+        )
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not contents:
+        return error_response(ParkingError("invalid_upload", "The uploaded file is empty.", 400))
+    if len(contents) > MAX_UPLOAD_BYTES:
+        return error_response(
+            ParkingError("invalid_upload", "The uploaded image exceeds the 10 MB limit.", 413)
+        )
+
+    try:
+        result = process_vehicle_entry(contents, filename)
+        return {"ok": True, "error": None, "data": result}
+    except ParkingError as error:
+        return error_response(error)
+
+
+@router.post("/process-exit")
+async def process_exit(file: UploadFile = File(...)):
+    filename = file.filename or ""
+    extension = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in ALLOWED_EXTENSIONS:
+        return error_response(
+            ParkingError("invalid_upload", "Upload a JPG, JPEG, or PNG image.", 415)
+        )
+
+    contents = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not contents:
+        return error_response(ParkingError("invalid_upload", "The uploaded file is empty.", 400))
+    if len(contents) > MAX_UPLOAD_BYTES:
+        return error_response(
+            ParkingError("invalid_upload", "The uploaded image exceeds the 10 MB limit.", 413)
+        )
+
+    try:
+        result = process_vehicle_exit(contents, filename)
         return {"ok": True, "error": None, "data": result}
     except ParkingError as error:
         return error_response(error)
@@ -196,6 +259,113 @@ def get_summary():
             content={
                 "ok": False,
                 "error": {"code": "summary_error", "message": "Parking summary could not be loaded."},
+                "data": None,
+            },
+        )
+
+
+@router.get("/fees/{fee_id}")
+def get_fee(fee_id: int):
+    fee = parking_fee.get_fee_by_id(fee_id)
+    if fee is None:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "ok": False,
+                "error": {"code": "fee_not_found", "message": "Fee record not found."},
+                "data": None,
+            },
+        )
+    return {"ok": True, "error": None, "data": fee}
+
+
+@router.post("/fees/{fee_id}/pay")
+def pay_fee(
+    fee_id: int,
+    request_data: Optional[PaymentActionRequest] = None,
+    x_admin_action: Optional[str] = Header(None, alias="X-Admin-Action"),
+):
+    # Enforce administrative/demo verification
+    is_admin = (
+        (x_admin_action and x_admin_action.strip().lower() in ("demo-admin", "admin-override"))
+        or (request_data and request_data.admin_token and request_data.admin_token.strip().lower() == "demo-admin-override")
+    )
+    if not is_admin:
+        return JSONResponse(
+            status_code=403,
+            content={
+                "ok": False,
+                "error": {
+                    "code": "unauthorized",
+                    "message": "Manual payment updates require verified administrative authorization.",
+                },
+                "data": None,
+            },
+        )
+    try:
+        updated = parking_fee.mark_fee_paid(fee_id, admin_auth=True)
+        return {"ok": True, "error": None, "data": updated}
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "ok": False,
+                "error": {"code": "fee_not_found", "message": str(exc)},
+                "data": None,
+            },
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": {"code": "payment_error", "message": f"Payment status could not be updated: {exc}"},
+                "data": None,
+            },
+        )
+
+
+@router.post("/fees/{fee_id}/confirm-exit")
+def confirm_exit(
+    fee_id: int,
+    x_admin_action: Optional[str] = Header(None, alias="X-Admin-Action"),
+):
+    """Confirm departure of a paid vehicle and release its parking slot."""
+    try:
+        result = vehicle_database.finalize_exit_by_fee_id(fee_id)
+        category = get_category(str(result["vehicle_type"]))
+        assigned_slot = str(result["assigned_slot"] or "")
+        reconcile_layout(str(result["vehicle_type"]))
+        if assigned_slot:
+            try:
+                draw_parking_layout(category, assigned_slot)
+            except Exception:
+                pass
+        return {"ok": True, "error": None, "data": result}
+    except PermissionError as exc:
+        return JSONResponse(
+            status_code=402,
+            content={
+                "ok": False,
+                "error": {"code": "payment_required", "message": str(exc)},
+                "data": None,
+            },
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "ok": False,
+                "error": {"code": "not_found", "message": str(exc)},
+                "data": None,
+            },
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": {"code": "exit_error", "message": f"Exit could not be confirmed: {exc}"},
                 "data": None,
             },
         )

@@ -121,6 +121,12 @@ input[type="file"] { flex: 1; }
 .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .legend-dot.assigned { border: 2px solid var(--accent); background: #fff; }
 
+.auth-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 16px; border-radius: 4px; font-weight: 600; margin-bottom: 14px; font-size: .88rem; }
+.auth-banner.blocked { background: #fdf2f2; border: 1px solid #f0b8b8; color: #a53d3d; }
+.auth-banner.authorized { background: #f2f9f5; border: 1px solid #b7e4cb; color: #2d704e; }
+.badge-blocked { display: inline-block; padding: 4px 8px; border-radius: 3px; background: #a53d3d; color: #fff; font-size: .76rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.badge-authorized { display: inline-block; padding: 4px 8px; border-radius: 3px; background: #2d704e; color: #fff; font-size: .76rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+
 @media (max-width: 1020px) {
   .sidebar { width: 210px; }
   .main-shell { margin-left: 210px; padding-right: 20px; padding-left: 20px; }
