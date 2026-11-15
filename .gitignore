@@ -1,14 +1,26 @@
+# Python environment and cache
 venv/
 __pycache__/
 *.pyc
+
+# Temporary files
 temp/
-output/*
 tempCodeRunnerFile.py
-*.python
 *.vscode
-/database/smart_parking.db
-uploads/
+
+# Generated output
+output/*
 !output/parking_layout/
 output/parking_layout/*
+
+# Keep base parking layout images
 !output/parking_layout/*_base_layout.jpg
+
+# Database
+/database/smart_parking.db
+
+# Uploaded images
+uploads/
+
+# Old backups
 backup_old_data/

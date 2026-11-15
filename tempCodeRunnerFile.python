@@ -1,0 +1,16 @@
+import os
+import pandas as pd
+PARKING_LAYOUT_CSV = "output/parking_layout/parking_layout.csv"
+
+def load_parking_layout():
+
+    if os.path.exists(PARKING_LAYOUT_CSV):
+        return pd.read_csv(PARKING_LAYOUT_CSV)
+
+    return pd.DataFrame()
+
+parking_df = load_parking_layout()
+
+print(parking_df)
+total_slots = len(parking_df)
+print(total_slots)
