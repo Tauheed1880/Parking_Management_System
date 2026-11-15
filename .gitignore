@@ -1,27 +1,35 @@
-# Python environment and cache
+# Virtual environment
 venv/
+
+# Database (contains local session data)
+database/*.db
+database/*.db-journal
+database/*.db-wal
+
+# Detection output images (generated at runtime)
+output/
+
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
 
-# Temporary files
-temp/
-tempCodeRunnerFile.py
-*.vscode
+# YOLO model weights (if large >100MB, host separately)
+*.pt
 
-# Generated output
-output/*
-!output/parking_layout/
-output/parking_layout/*
+# PaddleOCR cache
+.paddlex/
 
-# Keep base parking layout images
-!output/parking_layout/*_base_layout.jpg
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Database
-/database/smart_parking.db
+# IDE
+.vscode/
+.idea/
+*.swp
 
-# Uploaded images
-uploads/
-
-# Old backups
-backup_old_data/
-tempCodeRunnerFile.python
+# Environment variables
+.env
